@@ -122,11 +122,7 @@ fn subset_gdef(
     };
 
     let subset_mark_glyphsets_def = if version.minor >= 2 {
-        if let Some(mark_glyph_sets_def) = gdef
-            .mark_glyph_sets_def()
-            .transpose()
-            .map_err(|_| SerializeErrorFlags::SERIALIZE_ERROR_READ_ERROR)?
-        {
+        if let Some(mark_glyph_sets_def) = read_or_drop(gdef.mark_glyph_sets_def()) {
             !Offset16::serialize_subset(
                 &mark_glyph_sets_def,
                 s,
@@ -152,59 +148,44 @@ fn subset_gdef(
         }
     }
 
-    let subset_mark_attach_classdef = if let Some(mark_acttach_classdef) = gdef
-        .mark_attach_class_def()
-        .transpose()
-        .map_err(|_| SerializeErrorFlags::SERIALIZE_ERROR_READ_ERROR)?
-    {
-        match Offset16::serialize_subset(
-            &mark_acttach_classdef,
-            s,
-            plan,
-            &ClassDefSubsetStruct {
-                remap_class: false,
-                keep_empty_table: false,
-                use_class_zero: true,
-                glyph_filter: None,
-            },
-            markattach_classdef_offset_pos,
-        ) {
-            Ok(_) => true,
-            Err(SerializeErrorFlags::SERIALIZE_ERROR_EMPTY) => false,
-            Err(e) => {
-                return Err(e);
+    let subset_mark_attach_classdef =
+        if let Some(mark_acttach_classdef) = read_or_drop(gdef.mark_attach_class_def()) {
+            match Offset16::serialize_subset(
+                &mark_acttach_classdef,
+                s,
+                plan,
+                &ClassDefSubsetStruct {
+                    remap_class: false,
+                    keep_empty_table: false,
+                    use_class_zero: true,
+                    glyph_filter: None,
+                },
+                markattach_classdef_offset_pos,
+            ) {
+                Ok(_) => true,
+                Err(SerializeErrorFlags::SERIALIZE_ERROR_EMPTY) => false,
+                Err(e) => {
+                    return Err(e);
+                }
             }
-        }
-    } else {
-        false
-    };
+        } else {
+            false
+        };
 
-    let subset_ligcaret_list = if let Some(ligcaret_list) = gdef
-        .lig_caret_list()
-        .transpose()
-        .map_err(|_| SerializeErrorFlags::SERIALIZE_ERROR_READ_ERROR)?
-    {
+    let subset_ligcaret_list = if let Some(ligcaret_list) = read_or_drop(gdef.lig_caret_list()) {
         !Offset16::serialize_subset(&ligcaret_list, s, plan, (), ligcaret_list_offset_pos)
             .is_empty()?
     } else {
         false
     };
 
-    let subset_attach_list = if let Some(attach_list) = gdef
-        .attach_list()
-        .transpose()
-        .map_err(|_| SerializeErrorFlags::SERIALIZE_ERROR_READ_ERROR)?
-    {
+    let subset_attach_list = if let Some(attach_list) = read_or_drop(gdef.attach_list()) {
         !Offset16::serialize_subset(&attach_list, s, plan, (), attachlist_offset_pos).is_empty()?
     } else {
         false
     };
 
-    let subset_glyph_classdef = if let Some(glyph_classdef) = gdef
-        .glyph_class_def()
-        .transpose()
-        .map_err(|_| SerializeErrorFlags::SERIALIZE_ERROR_READ_ERROR)?
-    {
+    let subset_glyph_classdef = if let Some(glyph_classdef) = read_or_drop(gdef.glyph_class_def()) {
         match Offset16::serialize_subset(
             &glyph_classdef,
             s,
@@ -245,6 +226,14 @@ fn subset_gdef(
     } else {
         Err(SerializeErrorFlags::SERIALIZE_ERROR_EMPTY)
     }
+}
+
+/// Reads an optional GDEF subtable, treating a malformed one as absent.
+///
+/// hb-subset's sanitizer nulls the offset to a malformed subtable, so only that subtable is
+/// dropped and the rest of GDEF is kept.
+fn read_or_drop<T>(table: Option<Result<T, ReadError>>) -> Option<T> {
+    table.and_then(Result::ok)
 }
 
 impl SubsetTable<'_> for AttachList<'_> {

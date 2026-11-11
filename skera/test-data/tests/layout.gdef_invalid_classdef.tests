@@ -1,0 +1,10 @@
+FONTS:
+gdef-invalid-mark-attach-class-def.ttf
+
+PROFILES:
+default.txt
+retain-gids.txt
+
+SUBSETS:
+U+41,U+301
+*

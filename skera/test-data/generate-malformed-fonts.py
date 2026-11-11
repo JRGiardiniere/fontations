@@ -3,6 +3,9 @@
 
 * post-malformed-glyph-names.ttf: a post format 2 table with zero-length glyph names, a name
   index past the end of the string data, and a glyphNameIndex shorter than the glyph count.
+* gdef-invalid-mark-attach-class-def.ttf: a GDEF 1.0 table whose MarkAttachClassDef offset
+  points back into the GDEF header, so it reads as ClassDef format 0, next to a valid
+  GlyphClassDef.
 
 Usage, from the skera directory:
     test-data/generate-malformed-fonts.py
@@ -68,9 +71,20 @@ def post_malformed_glyph_names():
     return font
 
 
+def gdef_invalid_mark_attach_class_def():
+    font = build_font("GDEF Invalid MarkAttachClassDef")
+    # GlyphClassDef format 2: A-D base (1), acutecomb mark (3)
+    glyph_class_def = struct.pack(">HHHHHHHH", 2, 2, 2, 5, 1, 6, 6, 3)
+    # MarkAttachClassDef offset 2 lands on the minor version (0), read as ClassDef format 0.
+    data = struct.pack(">HHHHHH", 1, 0, 12, 0, 0, 2) + glyph_class_def
+    font["GDEF"] = raw_table("GDEF", data)
+    return font
+
+
 def main():
     for name, build in (
         ("post-malformed-glyph-names.ttf", post_malformed_glyph_names),
+        ("gdef-invalid-mark-attach-class-def.ttf", gdef_invalid_mark_attach_class_def),
     ):
         path = os.path.join(FONTS_DIR, name)
         build().save(path)
