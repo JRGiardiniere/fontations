@@ -1,0 +1,10 @@
+FONTS:
+post-malformed-glyph-names.ttf
+
+PROFILES:
+glyph-names.txt
+retain-gids-glyph-names.txt
+
+SUBSETS:
+U+43,U+44,U+301
+*

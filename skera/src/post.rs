@@ -100,10 +100,8 @@ fn subset_post_v2tail(
         .iter()
         .map(|(new, old)| (new.to_u32() as usize, old.to_u32() as usize))
     {
-        let old_name_idx = glyph_name_indices
-            .get(old_gid)
-            .ok_or_else(|| s.set_err(SerializeErrorFlags::SERIALIZE_ERROR_OTHER))?
-            .get();
+        // Like hb-subset, a glyph missing from glyphNameIndex gets index 0 (.notdef).
+        let old_name_idx = glyph_name_indices.get(old_gid).map_or(0, |idx| idx.get());
 
         let idx_pos = idx_start + new_gid * 2;
         if old_name_idx < 258 {
@@ -111,12 +109,10 @@ fn subset_post_v2tail(
         } else if let Some(idx) = old_to_new_idx_map.get(&old_name_idx) {
             s.copy_assign(idx_pos, *idx);
         } else {
-            let Some(string_data) = string_data else {
-                return Err(s.set_err(SerializeErrorFlags::SERIALIZE_ERROR_READ_ERROR));
-            };
-
-            let name_bytes = find_glyph_name(old_name_idx as usize, string_data, &index_to_offset)
-                .ok_or_else(|| s.set_err(SerializeErrorFlags::SERIALIZE_ERROR_READ_ERROR))?;
+            // Like hb-subset, a name missing from the string data is written as an empty name.
+            let name_bytes = string_data
+                .and_then(|data| find_glyph_name(old_name_idx as usize, data, &index_to_offset))
+                .unwrap_or(EMPTY_NAME);
 
             if let Some(idx) = name_bytes_to_new_idx_map.get(name_bytes) {
                 s.copy_assign(idx_pos, *idx);
@@ -145,6 +141,9 @@ fn subset_post_v2tail(
     Ok(())
 }
 
+/// A zero-length Pascal string.
+const EMPTY_NAME: &[u8] = &[0];
+
 fn find_glyph_name<'a>(
     idx: usize,
     string_data: &'a [u8],
@@ -152,9 +151,6 @@ fn find_glyph_name<'a>(
 ) -> Option<&'a [u8]> {
     let offset = index_to_offset.get(idx - 258)?;
     let len = string_data.get(*offset)?;
-    if *len == 0 {
-        return None;
-    }
     let start = *offset;
     let end = start + *len as usize + 1;
     string_data.get(start..end)

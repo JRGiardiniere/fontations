@@ -15,3 +15,8 @@ Describes the provenance, usage and generation procedures for font data used for
     ```
 
 [OFL]: https://scripts.sil.org/cms/scripts/page.php?site_id=nrsi&id=OFL
+
+## malformed test fonts
+`fonts/post-malformed-glyph-names.ttf` is a synthetic font written with fontTools by
+`generate-malformed-fonts.py`. It checks that skera copes with a malformed table the way
+hb-subset does.
